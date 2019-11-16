@@ -7,8 +7,8 @@ use bbggez::ggez::{
 use bbggez::rand;
 use bbggez::rand::prelude::*;
 use specs::{
-	Builder, Component, DenseVecStorage, Entities, Read, ReadStorage, RunNow, System, World,
-	WorldExt, Write, WriteStorage,
+	Builder, Component, DenseVecStorage, DispatcherBuilder, Entities, Read, ReadStorage, RunNow,
+	System, World, WorldExt, Write, WriteStorage,
 };
 
 pub struct Game {
@@ -50,8 +50,6 @@ impl EventHandler for Game {
 			self.world
 				.create_entity()
 				.with(Position::new(arena_size.0 / 2.0, arena_size.1 / 2.0))
-				.with(Size::new(3.0))
-				.with(Color::new(1.0, 1.0, 1.0, 0.5))
 				.with(Velocity::new())
 				.with(Mesh::new(context))
 				.build();
@@ -59,11 +57,16 @@ impl EventHandler for Game {
 			increment_entities.run_now(&self.world);
 		}
 
-		let mut move_system = MoveSystem(timer::delta(context).as_secs_f32());
-		let mut bounce_system = BounceOffWallsSystem(arena_size.0, arena_size.1);
+		let mut dispatcher = DispatcherBuilder::new()
+			.with(MoveSystem(timer::delta(context).as_secs_f32()), "move", &[])
+			.with(
+				BounceOffWallsSystem(arena_size.0, arena_size.1),
+				"bounce",
+				&[],
+			)
+			.build();
 
-		move_system.run_now(&self.world);
-		bounce_system.run_now(&self.world);
+		dispatcher.dispatch(&self.world);
 
 		self.world.maintain();
 
@@ -149,6 +152,17 @@ struct EntitiesCount(usize);
 impl EntitiesCount {
 	pub fn new() -> EntitiesCount {
 		EntitiesCount(0)
+	}
+}
+
+#[derive(Default)]
+struct RNG(ThreadRng);
+
+impl RNG {
+	pub fn new() -> RNG {
+		let rng = rand::thread_rng();
+
+		RNG(rng)
 	}
 }
 
